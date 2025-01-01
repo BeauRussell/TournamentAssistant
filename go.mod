@@ -5,6 +5,7 @@ go 1.22.10
 require (
 	gioui.org v0.7.1
 	github.com/machinebox/graphql v0.2.2
+	github.com/mattn/go-sqlite3 v1.14.24
 )
 
 require (
