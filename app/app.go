@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"image/color"
 	"log"
 	"os"
@@ -23,7 +22,12 @@ func TournamentAssistant(tournamentUrl string, key string) {
 	if len(parts) > 4 {
 		tournamentSlug = parts[4]
 	} else {
-		fmt.Println("Invalid URL format")
+		log.Println("Invalid URL format")
+		panic("Invalid URL format")
+	}
+	if key == "" {
+		log.Println("No API Key Supplied")
+		panic("No API Key Supplied")
 	}
 
 	startClient := startgg.Start{}

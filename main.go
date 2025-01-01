@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"image/color"
 	"log"
 	"strings"
@@ -16,14 +15,13 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	_ "github.com/mattn/go-sqlite3"
-
 	tourneyApp "github.com/BeauRussell/TournamentAssistant/app"
+	"github.com/BeauRussell/TournamentAssistant/db"
 )
 
 type captureResult struct {
-	tournamentSlug string
-	key            string
+	tournamentUrl string
+	key           string
 }
 
 func main() {
@@ -33,8 +31,8 @@ func main() {
 		captureWindow.Option(app.Title("Tournament Assistant"))
 		captureWindow.Option(app.Size(unit.Dp(800), unit.Dp(300)))
 		var result captureResult
-		result.key = checkKey()
-		err := runCapture(captureWindow, &result.tournamentSlug, &result.key)
+		result.key, result.tournamentUrl = db.CheckCaptureCache()
+		err := runCapture(captureWindow, &result.tournamentUrl, &result.key)
 		if err != nil {
 			log.Println("Window closed with error:", err)
 		}
@@ -43,17 +41,18 @@ func main() {
 	}()
 
 	result := <-resultChan
-	writeKey(result.key)
+	db.WriteCapture(result.key, result.tournamentUrl)
 
-	tourneyApp.TournamentAssistant(result.tournamentSlug, result.key)
+	tourneyApp.TournamentAssistant(result.tournamentUrl, result.key)
 	app.Main()
 }
 
-func runCapture(window *app.Window, tournamentSlug *string, key *string) error {
+func runCapture(window *app.Window, tournamentUrl *string, key *string) error {
 	theme := material.NewTheme()
 
 	var submitButton widget.Clickable
-	var slugInput widget.Editor
+	var urlInput widget.Editor
+	urlInput.SetText(*tournamentUrl)
 	var keyInput widget.Editor
 	keyInput.SetText(*key)
 
@@ -66,7 +65,7 @@ func runCapture(window *app.Window, tournamentSlug *string, key *string) error {
 			// This graphics context is used for managing the rendering state.
 			gtx := app.NewContext(&ops, e)
 			if submitButton.Clicked(gtx) {
-				*tournamentSlug = strings.TrimSpace(slugInput.Text())
+				*tournamentUrl = strings.TrimSpace(urlInput.Text())
 				*key = strings.TrimSpace(keyInput.Text())
 				window.Perform(system.ActionClose)
 				continue
@@ -100,9 +99,9 @@ func runCapture(window *app.Window, tournamentSlug *string, key *string) error {
 				),
 				layout.Rigid(
 					func(gtx layout.Context) layout.Dimensions {
-						slugInput.SingleLine = true
-						slugInput.Alignment = text.Middle
-						inputBox := material.Editor(theme, &slugInput, "")
+						urlInput.SingleLine = true
+						urlInput.Alignment = text.Middle
+						inputBox := material.Editor(theme, &urlInput, "")
 						inputBox.Color = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
 						inputBox.TextSize = unit.Sp(16)
 
@@ -201,72 +200,5 @@ func runCapture(window *app.Window, tournamentSlug *string, key *string) error {
 			// Pass the drawing operations to the GPU.
 			e.Frame(gtx.Ops)
 		}
-	}
-}
-
-func checkKey() string {
-	db, err := sql.Open("sqlite3", "data.db")
-	if err != nil {
-		log.Println("Failed to Open DB file")
-		panic(err)
-	}
-	defer db.Close()
-
-	createCmd := `
-		create table if not exists smash (id integer not null primary key, api);
-	`
-	_, err = db.Exec(createCmd)
-	if err != nil {
-		log.Printf("%q: %s\n", err, createCmd)
-		panic(err)
-	}
-
-	checkCmd := `
-		select api from smash where id = 1;
-	`
-
-	var key string
-	err = db.QueryRow(checkCmd).Scan(&key)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return ""
-		}
-		log.Printf("%q: %s\n", err, checkCmd)
-		panic(err)
-	}
-	log.Println(key)
-	return key
-}
-
-func writeKey(key string) {
-	db, err := sql.Open("sqlite3", "data.db")
-	if err != nil {
-		log.Println("Failed to Open DB file")
-		panic(err)
-	}
-	defer db.Close()
-
-	tx, err := db.Begin()
-	if err != nil {
-		log.Println("Failed to begin insert transaction")
-		panic(err)
-	}
-	stmt, err := tx.Prepare("insert or replace into smash (id, api) values(?,?)")
-	if err != nil {
-		log.Println("Failed to prepare insert transaction")
-		panic(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(1, key)
-	if err != nil {
-		log.Println("Failed to insert key")
-		panic(err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		log.Println("Failed to commit insert transaction")
-		panic(err)
 	}
 }
