@@ -32,6 +32,9 @@ func TournamentAssistant(tournamentUrl string, key string) {
 
 	startClient := startgg.Start{}
 	startClient.Setup(tournamentSlug, key)
+	tournament := startClient.GetEventData()
+
+	log.Println("Tournament data:", tournament)
 
 	go func() {
 		captureWindow := new(app.Window)
