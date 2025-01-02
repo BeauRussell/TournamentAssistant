@@ -2,7 +2,6 @@ package startgg
 
 import (
 	"log"
-	"net/http"
 
 	"github.com/BeauRussell/TournamentAssistant/graphql"
 )
@@ -24,8 +23,22 @@ type Tournament struct {
 	Events []Event `json:"events"`
 }
 
-type loggingTransport struct {
-	Transport http.RoundTripper
+type Entrant struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type StandingsNode struct {
+	Placement int     `json:"placement"`
+	Entrant   Entrant `json:"entrant"`
+}
+
+type EventStandings struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Standings struct {
+		Nodes []StandingsNode `json:"nodes"`
+	} `json:"standings"`
 }
 
 func (s *Start) Setup(tournamentSlug string, key string) {
@@ -34,7 +47,7 @@ func (s *Start) Setup(tournamentSlug string, key string) {
 	s.apiKey = key
 }
 
-func (s *Start) GetEventData() Tournament {
+func (s *Start) GetEventData() *Tournament {
 	request := graphql.Request{
 		Query: `query TournamentEvents($tourneySlug: String!) {
 			tournament(slug: $tourneySlug) {
@@ -62,5 +75,45 @@ func (s *Start) GetEventData() Tournament {
 		panic(err)
 	}
 
-	return respData.Data.Tournament
+	return &respData.Data.Tournament
+}
+
+func (s *Start) GetEventStandings(eventId int) EventStandings {
+	request := graphql.Request{
+		Query: `query EventStandings($eventId: ID!, $page: Int!, $perPage: Int!) {
+			event(id: $eventId) {
+				id
+				name
+				standings(query: {
+					perPage: $perPage,
+					page: $page
+				}){
+					nodes {
+						placement
+						entrant {
+							id
+							name
+						}
+					}
+				}
+			}
+		}`,
+		Variables: map[string]interface{}{
+			"eventId": eventId,
+			"page":    0,
+			"perPage": 20,
+		},
+	}
+
+	var respData struct {
+		Data struct {
+			EventStandings EventStandings `json:"event"`
+		} `json:"data"`
+	}
+
+	if err := s.client.Send(request, &respData); err != nil {
+		log.Println("Failed to get Event Standings:", err)
+	}
+
+	return respData.Data.EventStandings
 }

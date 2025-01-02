@@ -5,14 +5,15 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"gioui.org/app"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
-	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget/material"
+	"github.com/BeauRussell/TournamentAssistant/components"
 	"github.com/BeauRussell/TournamentAssistant/startgg"
 )
 
@@ -32,15 +33,13 @@ func TournamentAssistant(tournamentUrl string, key string) {
 
 	startClient := startgg.Start{}
 	startClient.Setup(tournamentSlug, key)
-	tournament := startClient.GetEventData()
-
-	log.Println("Tournament data:", tournament)
+	tournamentData := startClient.GetEventData()
 
 	go func() {
 		captureWindow := new(app.Window)
 		captureWindow.Option(app.Title("Tournament Assistant"))
 		captureWindow.Option(app.Size(unit.Dp(800), unit.Dp(200)))
-		err := runApp(captureWindow, tournamentSlug)
+		err := runApp(captureWindow, tournamentData, &startClient)
 		if err != nil {
 			log.Println("Window closed with error:", err)
 		}
@@ -50,8 +49,18 @@ func TournamentAssistant(tournamentUrl string, key string) {
 	app.Main()
 }
 
-func runApp(window *app.Window, tournamentSlug string) error {
+func runApp(window *app.Window, tournamentData *startgg.Tournament, startClient *startgg.Start) error {
 	theme := material.NewTheme()
+	selectBox := components.NewSelectBox(components.ConvertEventsToOptions(tournamentData.Events))
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	go func() {
+		for range ticker.C {
+			pullEventStandings(startClient, selectBox.SelectedOption)
+		}
+	}()
+
 	var ops op.Ops
 	for {
 		switch e := window.Event().(type) {
@@ -66,26 +75,9 @@ func runApp(window *app.Window, tournamentSlug string) error {
 				Axis:    layout.Vertical,
 				Spacing: layout.SpaceStart,
 			}.Layout(gtx,
-				layout.Rigid(
-					func(gtx layout.Context) layout.Dimensions {
-						margins := layout.Inset{
-							Top:    25,
-							Left:   25,
-							Bottom: 5,
-							Right:  0,
-						}
-
-						title := material.Label(theme, unit.Sp(25), tournamentSlug)
-						white := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-						title.Color = white
-						title.Alignment = text.Middle
-						return margins.Layout(gtx,
-							func(gtx layout.Context) layout.Dimensions {
-								return title.Layout(gtx)
-							},
-						)
-					},
-				),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return selectBox.Layout(gtx, theme)
+				}),
 			)
 
 			// Pass the drawing operations to the GPU.
