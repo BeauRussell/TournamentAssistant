@@ -41,6 +41,21 @@ type EventStandings struct {
 	} `json:"standings"`
 }
 
+type MatchNode struct {
+	MatchId string `json:"identifier"`
+	Slots   []struct {
+		Entrant Entrant `json:"entrant"`
+	} `json:"slots"`
+}
+
+type PhaseMatches struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Sets struct {
+		Nodes []MatchNode `json:"nodes"`
+	} `json:"sets"`
+}
+
 func (s *Start) Setup(tournamentSlug string, key string) {
 	s.client = graphql.NewClient("https://api.start.gg/gql/alpha", key)
 	s.tournamentSlug = tournamentSlug
@@ -116,4 +131,44 @@ func (s *Start) GetEventStandings(eventId int) EventStandings {
 	}
 
 	return respData.Data.EventStandings
+}
+
+func (s *Start) GetPhaseMatches(eventId int) []PhaseMatches {
+	request := graphql.Request{
+		Query: `query PhaseMatches($eventId: ID!) {
+			event(id: $eventId) {
+				phases {
+					id
+					name
+					sets {
+						nodes {
+							identifier
+							slots {
+								entrant {
+									name
+								}
+							}
+						}
+					}
+				}
+			}
+		}`,
+		Variables: map[string]interface{}{
+			"eventId": eventId,
+		},
+	}
+
+	var respData struct {
+		Data struct {
+			Event struct {
+				PhaseMatches []PhaseMatches `json:"phases"`
+			} `json:"event"`
+		} `json:"data"`
+	}
+
+	if err := s.client.Send(request, &respData); err != nil {
+		log.Println("Failed to get Phase Matches:", err)
+	}
+
+	return respData.Data.Event.PhaseMatches
 }

@@ -58,6 +58,7 @@ func runApp(window *app.Window, tournamentData *startgg.Tournament, startClient 
 	go func() {
 		for range ticker.C {
 			pullEventStandings(startClient, selectBox.SelectedOption)
+			pullBracketData(startClient, selectBox.SelectedOption)
 		}
 	}()
 

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/BeauRussell/TournamentAssistant/components"
 	"github.com/BeauRussell/TournamentAssistant/startgg"
@@ -13,15 +14,13 @@ import (
 func pullEventStandings(startClient *startgg.Start, event components.Option) {
 	standings := startClient.GetEventStandings(event.ID)
 
-	// Ensure the base directory exists
 	baseDir := filepath.Join("event", "standings")
-	err := os.MkdirAll(baseDir, os.ModePerm) // os.ModePerm is cross-platform default
+	err := os.MkdirAll(baseDir, os.ModePerm)
 	if err != nil {
 		log.Printf("Failed to create directories: %v\n", err)
 		return
 	}
 
-	// Write the event name to a file
 	eventFile := filepath.Join("event", "name.txt")
 	err = overwriteFile(eventFile, standings.Name)
 	if err != nil {
@@ -29,7 +28,6 @@ func pullEventStandings(startClient *startgg.Start, event components.Option) {
 		return
 	}
 
-	// Write standings to individual files
 	for _, standing := range standings.Standings.Nodes {
 		filePath := filepath.Join(baseDir, fmt.Sprintf("%d.txt", standing.Placement))
 		err = overwriteFile(filePath, standing.Entrant.Name)
@@ -39,18 +37,45 @@ func pullEventStandings(startClient *startgg.Start, event components.Option) {
 	}
 }
 
-func overwriteFile(filePath, content string) error {
-	// Create or truncate the file for writing
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+func pullBracketData(startClient *startgg.Start, event components.Option) {
+	phaseMatches := startClient.GetPhaseMatches(event.ID)
+
+	for _, phase := range phaseMatches {
+		if phase.Name == "Qualifiers" {
+			continue
+		}
+		baseDir := filepath.Join("event", "matches")
+		phaseDir := filepath.Join(baseDir, phase.Name)
+		err := os.MkdirAll(phaseDir, os.ModePerm)
+		if err != nil {
+			log.Printf("Failed to create directories: %v\n", err)
+			return
+		}
+
+		replacePhaseMatchups(phaseDir, phase.Sets.Nodes)
+	}
+}
+
+func replacePhaseMatchups(phaseDir string, matches []startgg.MatchNode) {
+	for _, match := range matches {
+		for index, slot := range match.Slots {
+			fileName := match.MatchId + "_" + strconv.Itoa(index) + ".txt"
+			overwriteFile(filepath.Join(phaseDir, fileName), slot.Entrant.Name)
+		}
+	}
+}
+
+func overwriteFile(path string, content string) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
-		return fmt.Errorf("failed to open file '%s': %w", filePath, err)
+		return fmt.Errorf("failed to open file '%s': %w", path, err)
 	}
 	defer file.Close()
 
 	// Write content to the file
 	_, err = file.WriteString(content)
 	if err != nil {
-		return fmt.Errorf("failed to write to file '%s': %w", filePath, err)
+		return fmt.Errorf("failed to write to file '%s': %w", path, err)
 	}
 
 	return nil
