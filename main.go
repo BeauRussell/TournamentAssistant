@@ -3,6 +3,7 @@ package main
 import (
 	"image/color"
 	"log"
+	"os"
 	"strings"
 
 	"gioui.org/app"
@@ -25,6 +26,13 @@ type captureResult struct {
 }
 
 func main() {
+	logFile, err := os.OpenFile("output.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+
 	resultChan := make(chan captureResult)
 	go func() {
 		captureWindow := new(app.Window)
