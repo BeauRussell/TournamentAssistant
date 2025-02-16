@@ -14,14 +14,14 @@ import (
 func pullEventStandings(startClient *startgg.Start, event components.Option) {
 	standings := startClient.GetEventStandings(event.ID)
 
-	baseDir := filepath.Join("event", "standings")
+	baseDir := filepath.Join("./event", "standings")
 	err := os.MkdirAll(baseDir, os.ModePerm)
 	if err != nil {
 		log.Printf("Failed to create directories: %v\n", err)
 		return
 	}
 
-	eventFile := filepath.Join("event", "name.txt")
+	eventFile := filepath.Join("./event", "name.txt")
 	err = overwriteFile(eventFile, standings.Name)
 	if err != nil {
 		log.Printf("Failed to write event name: %v\n", err)
@@ -44,7 +44,7 @@ func pullBracketData(startClient *startgg.Start, event components.Option) {
 		if phase.Name == "Qualifiers" {
 			continue
 		}
-		baseDir := filepath.Join("event", "matches")
+		baseDir := filepath.Join("./event", "matches")
 		phaseDir := filepath.Join(baseDir, phase.Name)
 		err := os.MkdirAll(phaseDir, os.ModePerm)
 		if err != nil {
